@@ -1,0 +1,27 @@
+version: "2"
+services:
+  upload_fpm:
+    image: php:7.0.23-fpm-final
+    volumes:
+      - /usr/share/zoneinfo/PRC:/etc/localtime
+      - ${APP_CODE_DIR}:/var/www/html
+      - ./conf/php/conf.d:/usr/local/etc/php/conf.d:ro
+      - /data/volumes/${COMPOSE_PROJECT_NAME}/upload/data/uploads:/var/www/html/src/public/uploads
+      - ./upload_fpm/docker-entrypoint-patch.sh:/docker-entrypoint-patch.sh
+    entrypoint: /docker-entrypoint-patch.sh php-fpm7.0 --nodaemonize
+    restart: always
+  upload_nginx:
+    image: nginx:1.13.5
+    volumes:
+      - /usr/share/zoneinfo/PRC:/etc/localtime
+      - ${APP_CODE_DIR}:/var/www/html
+      - /data/volumes/${COMPOSE_PROJECT_NAME}/upload/data/uploads:/var/www/html/src/public/uploads
+      - ./upload_nginx/conf/nginx.conf:/etc/nginx/nginx.conf
+      - /data/volumes/${COMPOSE_PROJECT_NAME}/upload_nginx/log/:/var/log/nginx/
+      - ./upload_nginx/docker-entrypoint-patch.sh:/docker-entrypoint-patch.sh
+    entrypoint: /docker-entrypoint-patch.sh nginx -g "daemon off;"
+    ports:
+      - ${UPLOAD_PORT}:80
+    restart: always
+    links:
+      - upload_fpm
