@@ -7,10 +7,12 @@ export REMOTE_ROOT="/home"
 (cd ${WORKSPACE}/devops/;chmod +x *.sh;)
 #(cd ${WORKSPACE}/devops/;chmod +x *.sh; ./test.sh)
 
-SERVICE_NAME="upload"
+SERVICE_NAME="image"
+RELATIVE_PATH="/dnf/image"
 TAR_NAME="${SERVICE_NAME}-${BUILD_ID}-`date +%y%m%d`"
 TAR_GZ="${TAR_NAME}.tar.gz"
 
+REMOTE_PATH="${REMOTE_ROOT}/jenkins_git"
 cd ${WORKSPACE}/devops
 rm -rf *.tar.gz
 
@@ -18,9 +20,10 @@ rm -rf *.tar.gz
 echo $BUILD_ID>"../build_id.txt"
 echo $GIT_COMMIT>"../git_commit.txt"
 
-find ../docker -name '*.sh'|xargs chmod +x
+#find ../docker -name '*.sh'|xargs chmod +x
 find ../devops -name '*.sh'|xargs chmod +x
-find ../docker -name '*.sh' -or -name "Dockerfile"|xargs dos2unix
+#find ../docker/upload_fpm -name '*.sh' -or -name "Dockerfile"|xargs dos2unix
+#find ../docker/upload_nginx -name '*.sh' -or -name "Dockerfile"|xargs dos2unix
 
 tar -czf ${TAR_GZ} -C .. . \
     --exclude=.git* --exclude=common/.git --exclude=vendor/.git\
@@ -37,7 +40,7 @@ tar -czf ${TAR_GZ} -C .. . \
 (ssh ${REMOTE_HOST} "cd ${REMOTE_PATH};
     sudo mkdir ${TAR_NAME};
     sudo tar xzf ${TAR_GZ}  -C ${TAR_NAME};
-    if [ ! -d "$SERVICE_NAME"]; then
+    if [ ! -d "$SERVICE_NAME" ]; then
         sudo ln -s ${TAR_NAME} ${SERVICE_NAME};
         (cd ${SERVICE_NAME}/docker; sudo docker-compose down; sudo docker-compose up -d --build)
     else
