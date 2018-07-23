@@ -17,6 +17,7 @@ class DataPackager
     const FAILED_CREATE_DIR = 103005;                                     // 创建目录失败
     const FILE_SIZE_EXCEEDS_LIMIT = 103006;                              // 上传文件大小超过限制
     const NO_TEMPORARY_FILE = 103007;                                   //保存临时文件失败
+    const FILE_EXIST = 103008;                                   //文件已存在
 
 
 

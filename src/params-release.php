@@ -7,7 +7,7 @@ return [
     'appName' => 'DM',
     'homePage' => 'http://www.dmgame111.com',
 
-    'uploadService' => 'https://cdn.h863.net/upload/',
+    'uploadService' => 'http://123.206.175.60:8060/',
 
     'tokenSignerKey' => 'BpFsnGKtY7Gl5Pa3kSm4HSezpLuRQC2h',            // token 签名使用的 key
     'tokenExpirationTime' => 60 * 60 * 24 * 30,    // token 过期时间，单位秒，30 天

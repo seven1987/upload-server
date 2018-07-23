@@ -35,21 +35,21 @@ if ($_SERVER['REQUEST_METHOD'] != 'POST') {
         exit;
     }
     // token校验
-    $tokenService = new TokenService();
-    // 非获取token的操作都要验证token
-    if ($act != 'auth') {
-        $token = isset($_POST['tk']) ? $_POST['tk'] : '';
-        if (empty($token)) {
-            echo DataPackager::pack([], DataPackager::FRONTEND_LOGIN_INVALID);
-            exit;
-        }
-        $res = (!empty(@$_POST['backend'])) ? $tokenService::authBackToken($token) : $tokenService::authToken($token);
-        if ($res['errno']!=0) {
-            http_response_code(401);
-            echo DataPackager::pack([], DataPackager::FRONTEND_LOGIN_INVALID, $res['msg']);
-            exit;
-        }
-    }
+    //$tokenService = new TokenService();
+    //// 非获取token的操作都要验证token
+    //if ($act != 'auth') {
+    //    //$token = isset($_POST['tk']) ? $_POST['tk'] : '';
+    //    if (empty($token)) {
+    //        echo DataPackager::pack([], DataPackager::FRONTEND_LOGIN_INVALID);
+    //        exit;
+    //    }
+    //    $res = (!empty(@$_POST['backend'])) ? $tokenService::authBackToken($token) : $tokenService::authToken($token);
+    //    if ($res['errno']!=0) {
+    //        http_response_code(401);
+    //        echo DataPackager::pack([], DataPackager::FRONTEND_LOGIN_INVALID, $res['msg']);
+    //        exit;
+    //    }
+    //}
     $uploadService = new UploadService();
     //根据操作类型执行上传
     switch ($act) {
@@ -115,40 +115,6 @@ if ($_SERVER['REQUEST_METHOD'] != 'POST') {
             $uploadRet = $uploadService::getImg();
             if ($uploadRet['code']==DataPackager::OK) {
                 echo DataPackager::pack($uploadRet['data'], DataPackager::OK);
-            } else {
-                http_response_code(401);
-                echo DataPackager::pack([], $uploadRet['code'], $uploadRet['msg']);
-            }
-            break;
-        /**
-         * 字节流上传
-         * @param string actionFrom  backend  来源是后台 仅后台使用
-         * @param string act  encode
-         * @param integer image_type 1：默认路径  2 ：后台战队图片目录 3：用户端战队图片 4： 个人头像  其它： 公共目录
-         * @param string file_data_field
-         * @param string name
-         * @return array
-         */
-        case "bi_form":
-            $uploadRet = $uploadService::bi_upload();
-            if ($uploadRet['code']==DataPackager::OK) {
-                $res['error'] = 0;
-                $res['message'] = $uploadRet['msg'];
-                $res['url'] = $uploadRet['url'];
-            } else {
-                $res['error'] = 1;
-                $res['message'] = $uploadRet['msg'];
-            }
-            $res = json_encode($res);
-            //kindeditor跨域上传专用: 上传后重定向到客户端设置的重定向地址
-            if (isset($_POST['redirect']) && !empty($_POST['redirect'])) {
-                http_response_code(301);
-                $redirect = $_POST['redirect'] . "?s=" . $res . "#" . $res;
-                header("Location: " . $redirect);
-                return;
-            }
-            if ($uploadRet['code']==DataPackager::OK) {
-                echo DataPackager::pack(['url' => $uploadRet['url']], DataPackager::OK, $uploadRet['msg']);
             } else {
                 http_response_code(401);
                 echo DataPackager::pack([], $uploadRet['code'], $uploadRet['msg']);

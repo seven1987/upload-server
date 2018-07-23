@@ -41,10 +41,16 @@ class UploadService
         static::$all_config = array_merge(static::$all_config, $params);
     }
 
+    public static function checkValue($var,$default){
+        return   (isset($var) && !empty($var))?$var:$default;
+    }
+
     /**
      *  表单图片上传
-     * @param string act  form
-     * @param integer image_type 1：默认路径  2 ：后台战队图片目录 3：用户端战队图片 4： 个人头像  其它： 公共目录
+     * @param string act  form          //行为
+     * @param bool rename              //是否改名
+     * @param bool enable_date_folder  //是否按日期分文件夹
+     * @param string folder
      * @param string file_data_field
      * @return array
      */
@@ -54,20 +60,29 @@ class UploadService
             return ['code' => DataPackager::INVALID_UPLOAD, 'msg' => '无效上传'];
         }
         //所有参数
-        $imageType = isset($_POST['image_type']) && !empty($_POST['image_type']) ? $_POST['image_type'] : 1;
-        $fileDataField = isset($_POST['file_data_field']) && !empty($_POST['file_data_field']) ? $_POST['file_data_field'] : 'Filedata';
-        $rename = $imageType == 2 ? false : true;//不进行重命名的图片类型
+        $fileDataField = static::checkValue($_POST['file_data_field'] , 'Filedata');
+        $rename = static::checkValue( $_POST['rename'], 0) ;//是否重命名
+        $folder = static::checkValue( $_POST['folder'], 'common');
+        $uploadPath = static::getUploadPath($folder);
 
-        // 根据上传类型获得保存的路径
-        $uploadPath = static::getImageSavePath($imageType);
-
-        //不重命名的时候， 验证名称不能含中文
-        if (!$rename && isset($_FILES[$fileDataField]['name'])) {
-            if (preg_match("/[\x{4e00}-\x{9fa5}]/u", $_FILES[$fileDataField]['name'])) {
-                return ['code' => DataPackager::CHINESE_FILE_NAME, 'msg' => '文件名不能包含中文'];
-            }
+        //是否启用分日期的文件夹
+        $folderByDate = static::checkValue($_POST['enable_date_folder'],0); //最大文件大小, 默认500K
+        if($folderByDate){
+            $uploadPath .= '/' . date('Ymd');
         }
 
+        if (!boolval($rename) && isset($_FILES[$fileDataField]['name'])) {
+            //不重命名的时候， 验证名称不能含中文
+            $filename =$_FILES[$fileDataField]['name'];
+            if (preg_match("/[\x{4e00}-\x{9fa5}]/u", $filename)) {
+                return ['code' => DataPackager::CHINESE_FILE_NAME, 'msg' => '文件名不能包含中文'];
+            }
+            //不重命名的时候， 验证文件是否已存在
+            $filepath = $uploadPath.'/'.$filename;
+            if(file_exists($filepath)){
+                return ['code' => DataPackager::FILE_EXIST, 'msg' => '文件已经存在'];
+            }
+        }
 
         //执行上传参数 type=image
         $params = [
@@ -91,12 +106,11 @@ class UploadService
         $maxSize = isset($params['max_size']) ? $params['max_size'] : $typeConfig['max_size']; //最大文件大小, 默认500K
         $uploadPath = isset($params['upload_path']) ? $params['upload_path'] : $typeConfig['upload_path']; //上传目录， 默认为全局图片上传目录
 
-        $uploadPath .= '/' . date('Ymd');
         if (!is_dir($uploadPath)) {
             mkdir($uploadPath, 0777, true);
         }
         if (!is_dir($uploadPath)) {
-            return ['code' => DataPackager::FAILED_CREATE_DIR, 'msg' => '创建目录失败'];
+            return ['code' => DataPackager::FAILED_CREATE_DIR, 'msg' => '创建目录失败'.$uploadPath];
         }
 
         //方法1：使用ci上传类库上传 （更安全）
@@ -124,6 +138,11 @@ class UploadService
         return ['code' => DataPackager::OK, 'msg' => '上传成功', 'url' => $url];
     }
 
+    public static function getUploadPath($folder){
+        $prefixFolder = './uploads/';
+        $uploadPath = $prefixFolder.$folder;
+        return $uploadPath;
+    }
     /**
      * 字节流上传
      * @param string act  encode
@@ -136,10 +155,18 @@ class UploadService
     {
         $type = 'image';
         $typeConfig = static::$all_config['upload_config'][$type];
-        $fileDataField = isset($_POST['file_data_field']) && !empty($_POST['file_data_field']) ? $_POST['file_data_field'] : $typeConfig['file_data_field'];
+        $fileDataField = static::checkValue($_POST['file_data_field'] , 'Filedata');
+        $folder = static::checkValue( $_POST['folder'], 'common');
+        $uploadPath = static::getUploadPath($folder);
 
-        //所有参数
-        $imageType = isset($_POST['image_type']) && !empty($_POST['image_type']) ? $_POST['image_type'] : 1;
+        //是否启用分日期的文件夹
+        $folderByDate =  static::checkValue($_POST['enable_date_folder'], false); //最大文件大小, 默认500K
+        if(!$folderByDate){
+            $uploadPath .= '/' . date('Ymd');
+        }
+        if (!is_dir($uploadPath)) {
+            mkdir($uploadPath, 0777, true);
+        }
 
         $file = $_POST[$fileDataField];
         if (empty($file)) {
@@ -157,14 +184,7 @@ class UploadService
 
         //方法2：重写图片文件
         //参数赋值
-        $maxSize = isset($params['max_size']) ? $params['max_size'] : $typeConfig['max_size']; //最大文件大小, 默认500K
-        // 根据上传类型获得保存的路径
-        $uploadPath = static::getImageSavePath($imageType);
-
-        $uploadPath .= '/' . date('Ymd');
-        if (!is_dir($uploadPath)) {
-            mkdir($uploadPath, 0777, true);
-        }
+        $maxSize = $typeConfig['max_size']; //最大文件大小, 默认500K
 
         //上传大小验证
         if (strlen($file) > ($maxSize * 1024)) {
@@ -213,26 +233,6 @@ class UploadService
         return ['code' =>  DataPackager::UPLOAD_FAILED, 'msg' => '上传失败'];
     }
 
-
-    // 根据上传类型获得保存的路径
-    private static function getImageSavePath($imageType = 1)
-    {
-        switch ($imageType) {
-            case 1://默认图片保存路径
-                return './uploads/images';
-            case 2://战队编辑图片保存路径
-                return './uploads/team/img';
-            case 3: //用户端战队图片保存路径
-                return './uploads/team/frontend/img';
-            case 4: //用户端个人头像
-                return './uploads/personal';
-            case 5: //数据录入
-                return './uploads/dc';
-            default:
-                return './uploads/common/'.$imageType;
-        }
-    }
-
     private static function _getHostName()
     {
         if (isset(static::$all_config['uploadService'])) {
@@ -265,10 +265,10 @@ class UploadService
     }
 
     /**
-     *  获取某类型上传的图片
+     *  获取某文件夹上传的图片
      *
      * @param string act  get
-     * @param integer image_type 1：默认路径  2 ：后台战队图片目录 3：用户端战队图片 4： 个人头像  其它： 公共目录
+     * @param string folder
      * @return array
      */
     public static function getImg()
@@ -277,9 +277,8 @@ class UploadService
         if ($_SERVER['REQUEST_METHOD'] != 'POST') {
             return ['code' => DataPackager::INVALID_UPLOAD, 'msg' => '无效操作'];
         }
-        //获取图片的类型
-        $imageType = isset($_POST['image_type']) && !empty($_POST['image_type']) ? $_POST['image_type'] : 1;
-        $filePath = static::getImageSavePath($imageType);
+        $folder = static::checkValue( $_POST['folder'], 'common');
+        $filePath = static::getUploadPath($folder);
         $url = static::_getHostName();
         $allTeamImg = static::scanFiles($filePath);
         foreach ($allTeamImg as & $img) {
@@ -287,115 +286,6 @@ class UploadService
                 $url . $img); // str_replace(rtrim(str_replace('\\', '/', ROOT_PATH), '/'), '', $img);
         }
         return ['code' => DataPackager::OK, 'data' => $allTeamImg];
-    }
-
-    /**
-     *  表单图片上传
-     * @param string act  bi_form
-     * @param integer image_type 1：默认路径  2 ：后台战队图片目录 3：用户端战队图片 4： 个人头像  其它： 公共目录
-     * @return array
-     */
-    public static function bi_upload()
-    {
-        if ($_SERVER['REQUEST_METHOD'] != 'POST') {
-            return ['code' => DataPackager::INVALID_UPLOAD, 'msg' => '无效上传'];
-        }
-        //所有参数
-        $imageType = isset($_POST['image_type']) && !empty($_POST['image_type']) ? $_POST['image_type'] : 1;
-        $fileDataField = 'Filedata';
-        $rename = $imageType == 2 ? false : true;//不进行重命名的图片类型
-
-        // 根据上传类型获得保存的路径
-        $uploadPath = static::getImageSavePath($imageType);
-        $isMulti = $_POST['multi'];
-
-        //参数赋值
-        $typeConfig = static::$all_config['upload_config']['image'];
-        $uploadPath .= '/' . date('Ymd');
-        if (!is_dir($uploadPath)) {
-            mkdir($uploadPath, 0777, true);
-        }
-        if (!is_dir($uploadPath)) {
-            return ['code' => DataPackager::FAILED_CREATE_DIR, 'msg' => '创建目录失败'];
-        }
-        //获取文件完整url路径
-        $fullPath = $uploadPath;
-        $fullPath = str_replace("\\", "/", $fullPath);
-        $fileSizeLimit = empty($_POST['fileSizeLimit']) ? $typeConfig['max_size']*1024 : $_POST['fileSizeLimit'];
-        if ($isMulti=="true") {
-            $fileList = $_FILES[$fileDataField];
-            $error_arr = [];
-            $url_arr = [];
-            foreach ($fileList['name'] as $key => $value) {
-                //不重命名的时候， 验证名称不能含中文
-                if (!$rename && isset($value)) {
-                    if (preg_match("/[\x{4e00}-\x{9fa5}]/u", $value)) {
-                        $error_arr[] = $value . '文件名不能包含中文';
-                        continue;
-                    }
-                }
-                if ($fileList['size'][$key] > $fileSizeLimit) {
-                    $error_arr[] = $value . '上传文件大小超过限制';
-                    continue;
-                }
-                $fileName = $value;
-                $fileArr = explode('.', $fileName);
-                $fileType = $fileArr[count($fileArr)-1];
-                if (strpos($fileType, $typeConfig['ext'])!== false) {
-                    $error_arr[] = $value.'上传类型错误';
-                    continue;
-                }
-                if ($rename) {
-                    $fileName = md5(substr($fileName, strpos('.'.$fileType, $fileName)).time().rand(100,999)).'.'.$fileType;
-                }
-                if (@move_uploaded_file($fileList['tmp_name'][$key], "$fullPath/$fileName")){
-                    @unlink($_FILES[$fileDataField]['tmp_name']);
-                    $documentRoot = str_replace("/", "\\/", str_replace("\\", "/", $_SERVER['DOCUMENT_ROOT']));
-                    $url = preg_replace('/^' . $documentRoot . '/', "", "$fullPath/$fileName");
-                    $url = preg_replace('/^\.\//', "", $url);
-                    $url = static::_getHostName() . trim($url, '/');
-                    $url_arr[] = $url;
-                } else {
-                    $error_arr[] = $value.'上传失败';
-                    continue;
-                }
-            }
-            $msg = '上传成功';
-            if (!empty($error_arr)) {
-                $msg = '部分上传成功'.implode("|", $error_arr);
-            }
-            return ['code' => DataPackager::OK, 'msg' => $msg, 'url' => $url_arr];
-
-        } else {
-            //不重命名的时候， 验证名称不能含中文
-            if (!$rename && isset($_FILES[$fileDataField]['name'])) {
-                if (preg_match("/[\x{4e00}-\x{9fa5}]/u", $_FILES[$fileDataField]['name'])) {
-                    return ['code' => DataPackager::CHINESE_FILE_NAME, 'msg' => '文件名不能包含中文'];
-                }
-            }
-            if ($_FILES[$fileDataField]['size'] > $fileSizeLimit) {
-                return ['code' => DataPackager::FILE_SIZE_EXCEEDS_LIMIT, 'msg' => '上传文件大小超过限制'];
-            }
-            $fileName = $_FILES[$fileDataField]['name'];
-            $fileArr = explode('.', $fileName);
-            $fileType = $fileArr[count($fileArr)-1];
-            if (strpos($fileType, $typeConfig['ext'])!== false) {
-                return ['code' => DataPackager::FAILED_CREATE_DIR, 'msg' => '上传类型错误'];
-            }
-            if ($rename) {
-                $fileName = md5(substr($fileName, strpos('.'.$fileType, $fileName)).time().rand(100,999)).'.'.$fileType;
-            }
-            if (@move_uploaded_file($_FILES[$fileDataField]['tmp_name'], "$fullPath/$fileName")){
-                @unlink($_FILES[$fileDataField]['tmp_name']);
-                $documentRoot = str_replace("/", "\\/", str_replace("\\", "/", $_SERVER['DOCUMENT_ROOT']));
-                $url = preg_replace('/^' . $documentRoot . '/', "", "$fullPath/$fileName");
-                $url = preg_replace('/^\.\//', "", $url);
-                $url = static::_getHostName() . trim($url, '/');
-                return ['code' => DataPackager::OK, 'msg' => '上传成功', 'url' => $url];
-            } else {
-                return ['code' => DataPackager::FAILED_CREATE_DIR, 'msg' => '上传失败'];
-            }
-        }
     }
 
     /**

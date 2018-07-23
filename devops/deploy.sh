@@ -2,17 +2,24 @@
 
 set -xe
 
-export REMOTE_HOST="root@123.206.175.60"
-export REMOTE_ROOT="/home"
-(cd ${WORKSPACE}/devops/;chmod +x *.sh;)
+#export REMOTE_HOST="root@123.206.175.60"
+#export REMOTE_ROOT="/home/dnf/image"
+#(cd ${WORKSPACE}/devops/;chmod +x *.sh;)
 #(cd ${WORKSPACE}/devops/;chmod +x *.sh; ./test.sh)
 
 SERVICE_NAME="image"
-RELATIVE_PATH="/dnf/image"
 TAR_NAME="${SERVICE_NAME}-${BUILD_ID}-`date +%y%m%d`"
 TAR_GZ="${TAR_NAME}.tar.gz"
 
-REMOTE_PATH="${REMOTE_ROOT}/jenkins_git"
+type=$1;
+REMOTE_PATH="${REMOTE_ROOT}/$type"
+case $type in
+    "dev") env_type="dev"; config_type="develop";;
+    "test") env_type="test"; config_type="test";;
+    "prod") env_type='prod'; config_type='release';;
+    *) echo "unknown type: $type"; exit 1;;
+esac
+
 cd ${WORKSPACE}/devops
 rm -rf *.tar.gz
 
@@ -22,6 +29,8 @@ echo $GIT_COMMIT>"../git_commit.txt"
 
 #find ../docker -name '*.sh'|xargs chmod +x
 find ../devops -name '*.sh'|xargs chmod +x
+find ../docker/upload_fpm -name '*.sh'|xargs chmod +x
+find ../docker/upload_nginx -name '*.sh'|xargs chmod +x
 #find ../docker/upload_fpm -name '*.sh' -or -name "Dockerfile"|xargs dos2unix
 #find ../docker/upload_nginx -name '*.sh' -or -name "Dockerfile"|xargs dos2unix
 
