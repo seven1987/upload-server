@@ -23,6 +23,9 @@ esac
 cd ${WORKSPACE}/devops
 rm -rf *.tar.gz
 
+cp  -f ../docker/.env-${env_type} ../docker/.env
+cp -f ../src/params-${config_type}.php ../src/params.php
+
 [ $type == prod ] && (cd ../src/public; cp -f crossdomain-prod.xml crossdomain.xml)
 echo $BUILD_ID>"../build_id.txt"
 echo $GIT_COMMIT>"../git_commit.txt"
